@@ -1,6 +1,6 @@
 'use client';
 
-import { Coins, Heart } from 'lucide-react';
+import { Coins, Heart, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { expToNextLevel } from '@/lib/rewards';
 import { ProgressBar } from './ui/ProgressBar';
@@ -14,6 +14,7 @@ export function Hud() {
   const level = useGameStore((s) => s.level);
   const exp = useGameStore((s) => s.exp);
   const gold = useGameStore((s) => s.gold);
+  const expBuffActive = useGameStore((s) => s.expBuffActive);
 
   const need = expToNextLevel(level);
   const hpPerHeart = maxHp / HEART_COUNT;
@@ -41,6 +42,11 @@ export function Hud() {
           <span className="flex items-center gap-1 font-bold text-amber-300">
             <Coins className="h-3.5 w-3.5" /> {gold}
           </span>
+          {expBuffActive && (
+            <span className="flex items-center gap-1 rounded-full border border-violet-500 bg-violet-950/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-300">
+              <Sparkles className="h-3 w-3" /> EXP UP
+            </span>
+          )}
           <AccountPanel />
         </div>
       </div>

@@ -38,6 +38,8 @@ interface CoreState {
   events: CombatEvent[];
   /** Pending mid-task reward-burst popup, if a task just crossed its milestone. Not persisted. */
   activeMilestone: MilestoneAlert | null;
+  /** One-time 1.5x EXP multiplier earned by consuming a milestone reward, applied to the next task completion. Not persisted. */
+  expBuffActive: boolean;
   /** Timestamp of the last meaningful change, used to resolve which device's save is newer during cloud sync. */
   updatedAt: number;
 }
@@ -58,6 +60,7 @@ const initialState: CoreState = {
   bossTotalSeconds: 0,
   events: [],
   activeMilestone: null,
+  expBuffActive: false,
   updatedAt: 0,
 };
 
@@ -93,6 +96,8 @@ interface GameActions {
   /** Advances a multi-step goal task by one; fires the milestone reward burst and, on reaching target, the normal completion reward. */
   advanceTask: (id: string) => void;
   dismissMilestone: () => void;
+  /** Consumes the pending pre-planned reward: heals +30 HP now and arms a one-time 1.5x EXP buff for the next task completion. */
+  claimReward: () => void;
   failTask: (id: string) => void;
   deleteTask: (id: string) => void;
 
@@ -119,12 +124,14 @@ export const useGameStore = create<CoreState & GameActions>()(
         const task = get().tasks.find((t) => t.id === id);
         if (!task || task.done) return;
         const reward = rollTaskReward(task.difficulty);
+        const buffed = get().expBuffActive;
+        const expGain = buffed ? Math.round(reward.exp * 1.5) : reward.exp;
 
         let leveledUp = false;
         let defeated = false;
 
         set((s) => {
-          const applied = applyExp(s, reward.exp);
+          const applied = applyExp(s, expGain);
           leveledUp = applied.leveledUp;
 
           let { gold, wave, monsterHp, monsterMaxHp } = s;
@@ -150,6 +157,7 @@ export const useGameStore = create<CoreState & GameActions>()(
             wave,
             monsterHp,
             monsterMaxHp,
+            expBuffActive: false,
             updatedAt: Date.now(),
           };
         });
@@ -158,6 +166,7 @@ export const useGameStore = create<CoreState & GameActions>()(
           kind: reward.crit ? 'crit' : 'attack',
           text: reward.crit ? `크리티컬! +${reward.gold}G` : `+${reward.gold}G`,
         });
+        if (buffed) get().pushEvent({ kind: 'heal', text: `EXP 버프 적용! +${expGain} EXP` });
         if (defeated) get().pushEvent({ kind: 'defeat', text: '몬스터 처치!' });
         if (leveledUp) get().pushEvent({ kind: 'heal', text: 'LEVEL UP!' });
       }
@@ -226,6 +235,16 @@ export const useGameStore = create<CoreState & GameActions>()(
       },
 
       dismissMilestone: () => set({ activeMilestone: null }),
+
+      claimReward: () => {
+        if (!get().activeMilestone) return;
+        set((s) => ({
+          hp: Math.min(s.maxHp, s.hp + 30),
+          expBuffActive: true,
+          updatedAt: Date.now(),
+        }));
+        get().pushEvent({ kind: 'heal', text: '+30 HP 회복!' });
+      },
 
       failTask: (id) => {
         const task = get().tasks.find((t) => t.id === id);
@@ -325,13 +344,14 @@ export const useGameStore = create<CoreState & GameActions>()(
 
       resetGame: () => set({ ...initialState, events: [], updatedAt: Date.now() }),
 
-      applyRemoteState: (remote) => set({ ...remote, events: [], activeMilestone: null }),
+      applyRemoteState: (remote) =>
+        set({ ...remote, events: [], activeMilestone: null, expBuffActive: false }),
       };
     },
     {
       name: 'dopamine-quest-save',
       partialize: (s) => {
-        const { events, activeMilestone, ...rest } = s;
+        const { events, activeMilestone, expBuffActive, ...rest } = s;
         return rest;
       },
     },
