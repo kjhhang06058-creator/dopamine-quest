@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CombatEvent, CombatEventKind, Difficulty, InventoryItem, Task } from '@/types';
+import { CombatEvent, CombatEventKind, Difficulty, InventoryItem, MilestoneAlert, Task } from '@/types';
 import {
   expToNextLevel,
   rollBossReward,
@@ -36,6 +36,8 @@ interface CoreState {
   bossSecondsLeft: number;
   bossTotalSeconds: number;
   events: CombatEvent[];
+  /** Pending mid-task reward-burst popup, if a task just crossed its milestone. Not persisted. */
+  activeMilestone: MilestoneAlert | null;
   /** Timestamp of the last meaningful change, used to resolve which device's save is newer during cloud sync. */
   updatedAt: number;
 }
@@ -55,8 +57,11 @@ const initialState: CoreState = {
   bossSecondsLeft: 0,
   bossTotalSeconds: 0,
   events: [],
+  activeMilestone: null,
   updatedAt: 0,
 };
+
+const DEFAULT_MILESTONE_PERCENT = 80;
 
 /** Applies exp gain and resolves any level-ups (full heal + higher max HP on level up). */
 function applyExp(
@@ -76,9 +81,18 @@ function applyExp(
   return { exp, level, maxHp, hp, leveledUp };
 }
 
+interface AddTaskOptions {
+  target?: number;
+  preReward?: string;
+  milestonePercent?: number;
+}
+
 interface GameActions {
-  addTask: (title: string, difficulty: Difficulty) => void;
+  addTask: (title: string, difficulty: Difficulty, options?: AddTaskOptions) => void;
   completeTask: (id: string) => void;
+  /** Advances a multi-step goal task by one; fires the milestone reward burst and, on reaching target, the normal completion reward. */
+  advanceTask: (id: string) => void;
+  dismissMilestone: () => void;
   failTask: (id: string) => void;
   deleteTask: (id: string) => void;
 
@@ -99,19 +113,9 @@ interface GameActions {
 
 export const useGameStore = create<CoreState & GameActions>()(
   persist(
-    (set, get) => ({
-      ...initialState,
-
-      pushEvent: (e) => set((s) => ({ events: [...s.events, { ...e, id: uid() }] })),
-      clearEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
-
-      addTask: (title, difficulty) =>
-        set((s) => ({
-          tasks: [{ id: uid(), title, difficulty, done: false, createdAt: Date.now() }, ...s.tasks],
-          updatedAt: Date.now(),
-        })),
-
-      completeTask: (id) => {
+    (set, get) => {
+      /** Shared by completeTask and advanceTask (once a goal's target is reached) — rolls the difficulty reward, damages the monster, and resolves level-ups. */
+      function applyTaskCompletion(id: string, finalProgress: number) {
         const task = get().tasks.find((t) => t.id === id);
         if (!task || task.done) return;
         const reward = rollTaskReward(task.difficulty);
@@ -137,7 +141,7 @@ export const useGameStore = create<CoreState & GameActions>()(
           }
 
           return {
-            tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: true } : t)),
+            tasks: s.tasks.map((t) => (t.id === id ? { ...t, done: true, progress: finalProgress } : t)),
             exp: applied.exp,
             level: applied.level,
             maxHp: applied.maxHp,
@@ -156,7 +160,72 @@ export const useGameStore = create<CoreState & GameActions>()(
         });
         if (defeated) get().pushEvent({ kind: 'defeat', text: '몬스터 처치!' });
         if (leveledUp) get().pushEvent({ kind: 'heal', text: 'LEVEL UP!' });
+      }
+
+      return {
+      ...initialState,
+
+      pushEvent: (e) => set((s) => ({ events: [...s.events, { ...e, id: uid() }] })),
+      clearEvent: (id) => set((s) => ({ events: s.events.filter((e) => e.id !== id) })),
+
+      addTask: (title, difficulty, options) => {
+        const target = Math.max(1, Math.round(options?.target ?? 1));
+        set((s) => ({
+          tasks: [
+            {
+              id: uid(),
+              title,
+              difficulty,
+              done: false,
+              createdAt: Date.now(),
+              target,
+              progress: 0,
+              preReward: options?.preReward,
+              milestonePercent: options?.milestonePercent ?? DEFAULT_MILESTONE_PERCENT,
+              milestoneFired: false,
+            },
+            ...s.tasks,
+          ],
+          updatedAt: Date.now(),
+        }));
       },
+
+      completeTask: (id) => {
+        const task = get().tasks.find((t) => t.id === id);
+        if (!task) return;
+        applyTaskCompletion(id, task.target || 1);
+      },
+
+      advanceTask: (id) => {
+        const task = get().tasks.find((t) => t.id === id);
+        if (!task || task.done) return;
+        const target = task.target || 1;
+        const nextProgress = Math.min(target, (task.progress || 0) + 1);
+
+        if (nextProgress >= target) {
+          applyTaskCompletion(id, nextProgress);
+          return;
+        }
+
+        const milestonePercent = task.milestonePercent || DEFAULT_MILESTONE_PERCENT;
+        const crossedMilestone = !task.milestoneFired && (nextProgress / target) * 100 >= milestonePercent;
+
+        set((s) => ({
+          tasks: s.tasks.map((t) =>
+            t.id === id
+              ? { ...t, progress: nextProgress, milestoneFired: t.milestoneFired || crossedMilestone }
+              : t,
+          ),
+          activeMilestone: crossedMilestone
+            ? { taskId: task.id, title: task.title, preReward: task.preReward || '보상' }
+            : s.activeMilestone,
+          updatedAt: Date.now(),
+        }));
+
+        get().pushEvent({ kind: 'attack', text: `진행 ${nextProgress}/${target}` });
+      },
+
+      dismissMilestone: () => set({ activeMilestone: null }),
 
       failTask: (id) => {
         const task = get().tasks.find((t) => t.id === id);
@@ -256,12 +325,13 @@ export const useGameStore = create<CoreState & GameActions>()(
 
       resetGame: () => set({ ...initialState, events: [], updatedAt: Date.now() }),
 
-      applyRemoteState: (remote) => set({ ...remote, events: [] }),
-    }),
+      applyRemoteState: (remote) => set({ ...remote, events: [], activeMilestone: null }),
+      };
+    },
     {
       name: 'dopamine-quest-save',
       partialize: (s) => {
-        const { events, ...rest } = s;
+        const { events, activeMilestone, ...rest } = s;
         return rest;
       },
     },
