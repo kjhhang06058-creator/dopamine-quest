@@ -8,12 +8,13 @@ import { useSync } from './SyncProvider';
 import { PixelButton } from './ui/PixelButton';
 
 export function AccountPanel() {
-  const { status, email, sendMagicLink, signOut } = useSync();
+  const { status, email, sendMagicLink, signInWithGoogle, signOut } = useSync();
   const [open, setOpen] = useState(false);
   const [inputEmail, setInputEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function handleSend() {
     const trimmed = inputEmail.trim();
@@ -24,6 +25,15 @@ export function AccountPanel() {
     setSending(false);
     if (res.error) setError(res.error);
     else setSent(true);
+  }
+
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    setError(null);
+    const res = await signInWithGoogle();
+    // On success the browser navigates away to Google, so this only resolves on failure.
+    setGoogleLoading(false);
+    if (res.error) setError(res.error);
   }
 
   const StatusIcon = email ? Cloud : CloudOff;
@@ -74,8 +84,27 @@ export function AccountPanel() {
                   {status !== 'disabled' && !email && (
                     <div className="flex flex-col gap-2">
                       <p className="text-[11px] text-zinc-400">
-                        이메일로 로그인 링크를 받아 집/사무실 기기 사이에 진행 상황을 동기화하세요. 비밀번호는 필요 없습니다.
+                        로그인하면 집/사무실 기기 사이에 진행 상황이 자동으로 동기화됩니다.
                       </p>
+
+                      <PixelButton
+                        variant="ghost"
+                        onClick={handleGoogleSignIn}
+                        disabled={googleLoading}
+                        className="flex items-center justify-center gap-2"
+                      >
+                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-black text-zinc-900">
+                          G
+                        </span>
+                        {googleLoading ? '이동 중...' : 'Google로 계속하기'}
+                      </PixelButton>
+
+                      <div className="flex items-center gap-2 text-[10px] text-zinc-600">
+                        <div className="h-px flex-1 bg-zinc-800" />
+                        또는 이메일 매직 링크
+                        <div className="h-px flex-1 bg-zinc-800" />
+                      </div>
+
                       {sent ? (
                         <div className="rounded border border-emerald-800 bg-emerald-950/50 p-2 text-[11px] text-emerald-300">
                           {inputEmail} 로 로그인 링크를 보냈습니다. 메일함을 확인해주세요.

@@ -10,6 +10,7 @@ interface SyncContextValue {
   status: SyncStatus;
   email: string | null;
   sendMagicLink: (email: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ const SyncContext = createContext<SyncContextValue>({
   status: 'disabled',
   email: null,
   sendMagicLink: async () => ({ error: 'Supabase가 설정되지 않았습니다.' }),
+  signInWithGoogle: async () => ({ error: 'Supabase가 설정되지 않았습니다.' }),
   signOut: async () => {},
 });
 
@@ -113,6 +115,15 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
+  async function signInWithGoogle() {
+    if (!supabase) return { error: 'Supabase가 설정되지 않았습니다.' };
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
+    });
+    return { error: error?.message ?? null };
+  }
+
   async function signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
@@ -120,5 +131,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     setStatus('signed-out');
   }
 
-  return <SyncContext.Provider value={{ status, email, sendMagicLink, signOut }}>{children}</SyncContext.Provider>;
+  return (
+    <SyncContext.Provider value={{ status, email, sendMagicLink, signInWithGoogle, signOut }}>
+      {children}
+    </SyncContext.Provider>
+  );
 }

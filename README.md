@@ -38,8 +38,21 @@ npm run dev
    NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
    ```
-5. **Authentication → URL Configuration**에서 Site URL과 Redirect URLs에 `http://localhost:3000`과 실제 배포 도메인을 등록합니다 (매직 링크가 정확한 주소로 돌아오게 하기 위함).
+5. **Authentication → URL Configuration**에서 Site URL과 Redirect URLs에 `http://localhost:3000`과 실제 배포 도메인을 등록합니다 (매직 링크/OAuth가 정확한 주소로 돌아오게 하기 위함).
 6. `npm run dev`로 실행 후, 화면 오른쪽 위 **동기화** 버튼을 눌러 이메일을 입력하면 로그인 링크가 발송됩니다. 링크를 클릭하면 자동으로 로그인되고, 이후 진행 상황이 자동으로 클라우드에 저장/동기화됩니다.
+
+### Google 로그인 켜기 (선택)
+
+매직 링크 대신/함께 Google 계정으로 한 번에 로그인하려면 추가 설정이 필요합니다.
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → 새 프로젝트(또는 기존 프로젝트) → **APIs & Services → Credentials** → **Create Credentials → OAuth client ID** → Application type: **Web application**.
+2. **Authorized redirect URIs**에 아래 주소를 정확히 추가합니다 (Supabase가 콜백을 받는 고정 주소입니다).
+   ```
+   https://grkslbzluzyqsotzpzfh.supabase.co/auth/v1/callback
+   ```
+3. 생성된 **Client ID**와 **Client Secret**을 복사합니다.
+4. Supabase 대시보드 → **Authentication → Providers → Google**을 열고 Enable 토글을 켠 뒤 Client ID/Secret을 붙여넣고 저장합니다.
+5. 별도의 코드 변경 없이 바로 동작합니다 — 동기화 패널에 이미 "Google로 계속하기" 버튼이 준비되어 있습니다.
 
 같은 이메일로 다른 기기에서도 로그인하면, 로그인 순간 로컬 세이브와 클라우드 세이브 중 더 최근에 갱신된 쪽으로 자동 병합됩니다.
 
