@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { SyncProvider } from '@/components/SyncProvider';
 
 export const metadata: Metadata = {
   title: 'Dopamine Quest',
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
-      <body className="bg-zinc-950">{children}</body>
+      <body className="bg-zinc-950">
+        <SyncProvider>{children}</SyncProvider>
+      </body>
     </html>
   );
 }

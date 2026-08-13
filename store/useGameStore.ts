@@ -36,6 +36,8 @@ interface CoreState {
   bossSecondsLeft: number;
   bossTotalSeconds: number;
   events: CombatEvent[];
+  /** Timestamp of the last meaningful change, used to resolve which device's save is newer during cloud sync. */
+  updatedAt: number;
 }
 
 const initialState: CoreState = {
@@ -53,6 +55,7 @@ const initialState: CoreState = {
   bossSecondsLeft: 0,
   bossTotalSeconds: 0,
   events: [],
+  updatedAt: 0,
 };
 
 /** Applies exp gain and resolves any level-ups (full heal + higher max HP on level up). */
@@ -90,6 +93,8 @@ interface GameActions {
   clearEvent: (id: string) => void;
 
   resetGame: () => void;
+  /** Overwrites core save fields from a cloud snapshot (used by cloud sync). Never touches `events`. */
+  applyRemoteState: (remote: CoreState) => void;
 }
 
 export const useGameStore = create<CoreState & GameActions>()(
@@ -103,6 +108,7 @@ export const useGameStore = create<CoreState & GameActions>()(
       addTask: (title, difficulty) =>
         set((s) => ({
           tasks: [{ id: uid(), title, difficulty, done: false, createdAt: Date.now() }, ...s.tasks],
+          updatedAt: Date.now(),
         })),
 
       completeTask: (id) => {
@@ -140,6 +146,7 @@ export const useGameStore = create<CoreState & GameActions>()(
             wave,
             monsterHp,
             monsterMaxHp,
+            updatedAt: Date.now(),
           };
         });
 
@@ -158,14 +165,21 @@ export const useGameStore = create<CoreState & GameActions>()(
         set((s) => ({
           tasks: s.tasks.filter((t) => t.id !== id),
           hp: Math.max(0, s.hp - dmg),
+          updatedAt: Date.now(),
         }));
         get().pushEvent({ kind: 'hurt', text: `-${dmg} HP` });
       },
 
-      deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+      deleteTask: (id) =>
+        set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id), updatedAt: Date.now() })),
 
       startBoss: (minutes) =>
-        set({ bossStatus: 'running', bossSecondsLeft: minutes * 60, bossTotalSeconds: minutes * 60 }),
+        set({
+          bossStatus: 'running',
+          bossSecondsLeft: minutes * 60,
+          bossTotalSeconds: minutes * 60,
+          updatedAt: Date.now(),
+        }),
 
       tickBoss: () => {
         const s = get();
@@ -197,6 +211,7 @@ export const useGameStore = create<CoreState & GameActions>()(
                 },
                 ...st.inventory,
               ],
+              updatedAt: Date.now(),
             };
           });
           get().pushEvent({ kind: 'defeat', text: `보스 처치! +${reward.gold}G` });
@@ -207,7 +222,11 @@ export const useGameStore = create<CoreState & GameActions>()(
 
       giveUpBoss: () => {
         if (get().bossStatus !== 'running') return;
-        set((s) => ({ bossStatus: 'failed', hp: Math.max(0, s.hp - BOSS_FAIL_DAMAGE) }));
+        set((s) => ({
+          bossStatus: 'failed',
+          hp: Math.max(0, s.hp - BOSS_FAIL_DAMAGE),
+          updatedAt: Date.now(),
+        }));
         get().pushEvent({ kind: 'hurt', text: `보스에게 당함! -${BOSS_FAIL_DAMAGE} HP` });
       },
 
@@ -230,11 +249,14 @@ export const useGameStore = create<CoreState & GameActions>()(
             },
             ...s.inventory,
           ],
+          updatedAt: Date.now(),
         }));
         get().pushEvent({ kind: 'gacha', text: `${item.icon} ${item.name} 획득!` });
       },
 
-      resetGame: () => set({ ...initialState, events: [] }),
+      resetGame: () => set({ ...initialState, events: [], updatedAt: Date.now() }),
+
+      applyRemoteState: (remote) => set({ ...remote, events: [] }),
     }),
     {
       name: 'dopamine-quest-save',

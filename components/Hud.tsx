@@ -4,6 +4,7 @@ import { Coins, Heart } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { expToNextLevel } from '@/lib/rewards';
 import { ProgressBar } from './ui/ProgressBar';
+import { AccountPanel } from './AccountPanel';
 
 const HEART_COUNT = 5;
 
@@ -40,6 +41,7 @@ export function Hud() {
           <span className="flex items-center gap-1 font-bold text-amber-300">
             <Coins className="h-3.5 w-3.5" /> {gold}
           </span>
+          <AccountPanel />
         </div>
       </div>
       <div className="mt-2">
