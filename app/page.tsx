@@ -7,6 +7,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { FloatingTexts } from '@/components/FloatingTexts';
 import { ScreenEffects } from '@/components/ScreenEffects';
 import { RewardBurstModal } from '@/components/RewardBurstModal';
+import { MilestoneBreakModal } from '@/components/reward/MilestoneBreakModal';
 import { QuestTab } from '@/components/tabs/QuestTab';
 import { BossRaidTab } from '@/components/tabs/BossRaidTab';
 import { ShopTab } from '@/components/tabs/ShopTab';
@@ -19,6 +20,7 @@ export default function Home() {
     <main className="mx-auto flex h-dvh max-w-md flex-col bg-zinc-950 text-zinc-100">
       <ScreenEffects />
       <RewardBurstModal />
+      <MilestoneBreakModal />
       <Hud />
       <div className="relative border-b border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950">
         <FloatingTexts />

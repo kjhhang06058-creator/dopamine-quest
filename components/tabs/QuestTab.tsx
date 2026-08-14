@@ -6,6 +6,7 @@ import { Check, ChevronRight, Flame, Gift, Plus, Trash2 } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PixelButton } from '../ui/PixelButton';
 import { DopamineBar } from '../ui/DopamineBar';
+import { PrePlannedRewardCard } from '../reward/PrePlannedRewardCard';
 import { Difficulty } from '@/types';
 
 const DIFFICULTY_META: Record<Difficulty, { label: string; color: string }> = {
@@ -50,6 +51,8 @@ export function QuestTab() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      <PrePlannedRewardCard />
+
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
           <input

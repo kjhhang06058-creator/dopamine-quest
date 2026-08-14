@@ -13,6 +13,7 @@
 | 집중 모드 | 뽀모도로 보스 레이드 — 탭 이탈/포기 시 즉시 패배, 완주 시 대량 보상 + 확정 에픽 이상 전리품 |
 | 상점 | 골드 가챠(4등급 확률 테이블), 프리미엄 테마 잠금 UI(결제 미연동, 자리만 준비) |
 | 목표 모드 | 사전 할당 도파민 보상 스케줄러 — 퀘스트에 목표 횟수/사전 보상(실물)/마일스톤(기본 80%)을 설정하면, 마일스톤 도달 시 축하 팝업, 목표 완주 시 기존 몬스터 공격 보상. 팝업에서 "보상 섭취" 시 +30 HP 즉시 회복 + 다음 퀘스트 완료에 1.5배 EXP 버프(HUD에 EXP UP 배지 표시) |
+| 일일 예약 보상 | 목표 모드와 별개로, 퀘스트 탭 최상단 `PrePlannedRewardCard`에서 "오늘 하루 전체" 보상 1개를 예약(제목 + 70/80/90% 마일스톤). 오늘 전체 태스크 완료율이 마일스톤을 넘으면 `MilestoneBreakModal`(강제 휴식 팝업)이 자동으로 뜨고, "보상 섭취"로 +30 HP + EXP 버프를 받음. 목표 모드(개별 태스크 다단계 진행률)와 서로 독립적으로 공존 |
 | 백엔드 | Supabase Auth(이메일 매직 링크 + Google OAuth) + PostgreSQL + RLS, 로그인 시 로컬↔클라우드 세이브를 `updatedAt` 기준으로 병합, 이후 변경사항 디바운스 업로드 |
 | 배포/협업 | 독립 GitHub 저장소(`kjhhang06058-creator/dopamine-quest`), 로컬 빌드/개발 서버 검증 완료 |
 
@@ -44,3 +45,4 @@
 - Google OAuth 로그인 추가 — 커밋 `412d854`
 - 사전 할당 도파민 보상 스케줄러 (목표 모드, DopamineBar, RewardBurstModal) — 커밋 `f73409b`
 - 보상 섭취 시 HP 회복 + EXP 버프 (claimReward, expBuffActive) — 기존 마일스톤 팝업 확장
+- 일일 예약 보상 카드 + 강제 휴식 팝업 (PrePlannedRewardCard, MilestoneBreakModal, dailyReward) — 목표 모드와 별개의 전역 보상 시스템 신설

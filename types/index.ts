@@ -27,6 +27,16 @@ export interface MilestoneAlert {
   preReward: string;
 }
 
+/** A single reward reserved for the whole day, unlocked by overall (not per-task) daily completion %. */
+export interface DailyReward {
+  title: string;
+  milestonePercent: number;
+  /** Whether daily progress has crossed milestonePercent (locks in the trigger so it only fires once). */
+  fired: boolean;
+  /** Whether the player has consumed the reward (+30 HP / EXP buff) after it fired. */
+  claimed: boolean;
+}
+
 export interface InventoryItem {
   id: string;
   itemId: string;

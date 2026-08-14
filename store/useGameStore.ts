@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CombatEvent, CombatEventKind, Difficulty, InventoryItem, MilestoneAlert, Task } from '@/types';
+import { CombatEvent, CombatEventKind, DailyReward, Difficulty, InventoryItem, MilestoneAlert, Task } from '@/types';
 import {
   expToNextLevel,
   rollBossReward,
@@ -40,6 +40,10 @@ interface CoreState {
   activeMilestone: MilestoneAlert | null;
   /** One-time 1.5x EXP multiplier earned by consuming a milestone reward, applied to the next task completion. Not persisted. */
   expBuffActive: boolean;
+  /** Reward reserved for the whole day, unlocked once overall task completion % crosses its milestone. */
+  dailyReward: DailyReward | null;
+  /** Pending daily-milestone break popup, shown once dailyReward.fired flips true. Not persisted. */
+  activeDailyMilestone: boolean;
   /** Timestamp of the last meaningful change, used to resolve which device's save is newer during cloud sync. */
   updatedAt: number;
 }
@@ -61,6 +65,8 @@ const initialState: CoreState = {
   events: [],
   activeMilestone: null,
   expBuffActive: false,
+  dailyReward: null,
+  activeDailyMilestone: false,
   updatedAt: 0,
 };
 
@@ -101,6 +107,14 @@ interface GameActions {
   failTask: (id: string) => void;
   deleteTask: (id: string) => void;
 
+  /** Reserves a single reward for the day, unlocked once overall task completion reaches milestonePercent. */
+  setDailyReward: (title: string, milestonePercent: number) => void;
+  /** Cancels the current daily reward so a new one can be reserved. */
+  clearDailyReward: () => void;
+  dismissDailyMilestone: () => void;
+  /** Consumes the fired daily reward: heals +30 HP now and arms a one-time 1.5x EXP buff for the next task completion. */
+  claimDailyReward: () => void;
+
   startBoss: (minutes: number) => void;
   tickBoss: () => void;
   giveUpBoss: () => void;
@@ -119,6 +133,31 @@ interface GameActions {
 export const useGameStore = create<CoreState & GameActions>()(
   persist(
     (set, get) => {
+      /** Shared by claimReward and claimDailyReward — heals +30 HP (capped) and arms the next-completion EXP buff. */
+      function grantRewardBonus(label: string) {
+        set((s) => ({
+          hp: Math.min(s.maxHp, s.hp + 30),
+          expBuffActive: true,
+          updatedAt: Date.now(),
+        }));
+        get().pushEvent({ kind: 'heal', text: `+30 HP 회복! (${label})` });
+      }
+
+      /** Checks overall task completion % against the reserved daily reward and fires the break popup once, the first time it's crossed. */
+      function maybeFireDailyMilestone() {
+        const s = get();
+        const reward = s.dailyReward;
+        if (!reward || reward.fired || s.tasks.length === 0) return;
+        const donePercent = (s.tasks.filter((t) => t.done).length / s.tasks.length) * 100;
+        if (donePercent >= reward.milestonePercent) {
+          set({
+            dailyReward: { ...reward, fired: true },
+            activeDailyMilestone: true,
+            updatedAt: Date.now(),
+          });
+        }
+      }
+
       /** Shared by completeTask and advanceTask (once a goal's target is reached) — rolls the difficulty reward, damages the monster, and resolves level-ups. */
       function applyTaskCompletion(id: string, finalProgress: number) {
         const task = get().tasks.find((t) => t.id === id);
@@ -169,6 +208,7 @@ export const useGameStore = create<CoreState & GameActions>()(
         if (buffed) get().pushEvent({ kind: 'heal', text: `EXP 버프 적용! +${expGain} EXP` });
         if (defeated) get().pushEvent({ kind: 'defeat', text: '몬스터 처치!' });
         if (leveledUp) get().pushEvent({ kind: 'heal', text: 'LEVEL UP!' });
+        maybeFireDailyMilestone();
       }
 
       return {
@@ -238,12 +278,31 @@ export const useGameStore = create<CoreState & GameActions>()(
 
       claimReward: () => {
         if (!get().activeMilestone) return;
-        set((s) => ({
-          hp: Math.min(s.maxHp, s.hp + 30),
-          expBuffActive: true,
+        grantRewardBonus('목표 보상');
+      },
+
+      setDailyReward: (title, milestonePercent) => {
+        const trimmed = title.trim();
+        if (!trimmed) return;
+        set({
+          dailyReward: { title: trimmed, milestonePercent, fired: false, claimed: false },
+          activeDailyMilestone: false,
           updatedAt: Date.now(),
+        });
+      },
+
+      clearDailyReward: () =>
+        set({ dailyReward: null, activeDailyMilestone: false, updatedAt: Date.now() }),
+
+      dismissDailyMilestone: () => set({ activeDailyMilestone: false }),
+
+      claimDailyReward: () => {
+        const reward = get().dailyReward;
+        if (!reward || !reward.fired || reward.claimed) return;
+        grantRewardBonus('일일 보상');
+        set((s) => ({
+          dailyReward: s.dailyReward ? { ...s.dailyReward, claimed: true } : null,
         }));
-        get().pushEvent({ kind: 'heal', text: '+30 HP 회복!' });
       },
 
       failTask: (id) => {
@@ -345,13 +404,19 @@ export const useGameStore = create<CoreState & GameActions>()(
       resetGame: () => set({ ...initialState, events: [], updatedAt: Date.now() }),
 
       applyRemoteState: (remote) =>
-        set({ ...remote, events: [], activeMilestone: null, expBuffActive: false }),
+        set({
+          ...remote,
+          events: [],
+          activeMilestone: null,
+          expBuffActive: false,
+          activeDailyMilestone: false,
+        }),
       };
     },
     {
       name: 'dopamine-quest-save',
       partialize: (s) => {
-        const { events, activeMilestone, expBuffActive, ...rest } = s;
+        const { events, activeMilestone, expBuffActive, activeDailyMilestone, ...rest } = s;
         return rest;
       },
     },
