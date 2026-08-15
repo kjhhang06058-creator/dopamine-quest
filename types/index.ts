@@ -2,6 +2,7 @@ export type Difficulty = 'easy' | 'normal' | 'hard';
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 export type ItemType = 'pet' | 'weapon';
 export type Tab = 'quest' | 'raid' | 'shop';
+export type ThemeId = 'default' | 'cyberpunk' | 'darkfantasy' | 'gameboy';
 
 export interface Task {
   id: string;
@@ -9,6 +10,8 @@ export interface Task {
   difficulty: Difficulty;
   done: boolean;
   createdAt: number;
+  /** When the task was completed, used to scope "today's progress" and the completed list. */
+  completedAt?: number;
   /** Total steps needed to complete this task. 1 = simple one-click quest (default). */
   target: number;
   /** Steps completed so far, 0..target. */
@@ -31,6 +34,8 @@ export interface MilestoneAlert {
 export interface DailyReward {
   title: string;
   milestonePercent: number;
+  /** Local 'YYYY-MM-DD' the reward was reserved for. A reward from an earlier day is expired. */
+  date: string;
   /** Whether daily progress has crossed milestonePercent (locks in the trigger so it only fires once). */
   fired: boolean;
   /** Whether the player has consumed the reward (+30 HP / EXP buff) after it fired. */
@@ -47,7 +52,7 @@ export interface InventoryItem {
   obtainedAt: number;
 }
 
-export type CombatEventKind = 'attack' | 'crit' | 'defeat' | 'hurt' | 'heal' | 'gacha';
+export type CombatEventKind = 'attack' | 'crit' | 'defeat' | 'hurt' | 'heal' | 'gacha' | 'guard';
 
 export interface CombatEvent {
   id: string;

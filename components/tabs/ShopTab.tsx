@@ -1,11 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Gem, Lock, RotateCcw, Sparkles } from 'lucide-react';
+import { Check, FlaskConical, Gem, Lock, RotateCcw, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PixelButton } from '../ui/PixelButton';
 import { GACHA_COST } from '@/lib/gacha';
-import { Rarity } from '@/types';
+import { STREAK_SHIELD_COST } from '@/lib/rewards';
+import { THEMES } from '@/lib/themes';
+import { Rarity, ThemeId } from '@/types';
 
 const RARITY_STYLE: Record<Rarity, string> = {
   common: 'border-zinc-600 text-zinc-300',
@@ -14,16 +16,17 @@ const RARITY_STYLE: Record<Rarity, string> = {
   legendary: 'border-amber-400 text-amber-300',
 };
 
-const PREMIUM_THEMES = [
-  { id: 'cyberpunk', name: '사이버펑크 네온', icon: '🌆' },
-  { id: 'darkfantasy', name: '다크 판타지', icon: '🕯️' },
-  { id: 'gameboy', name: '게임보이 레트로', icon: '🎮' },
-];
+const DEFAULT_THEME_CARD = { id: 'default' as ThemeId, name: '기본 테마', icon: '⬛', cost: 0 };
 
 export function ShopTab() {
   const gold = useGameStore((s) => s.gold);
   const inventory = useGameStore((s) => s.inventory);
+  const streakShields = useGameStore((s) => s.streakShields);
+  const ownedThemes = useGameStore((s) => s.ownedThemes);
+  const activeTheme = useGameStore((s) => s.activeTheme);
   const pullShopGacha = useGameStore((s) => s.pullShopGacha);
+  const buyStreakShield = useGameStore((s) => s.buyStreakShield);
+  const selectTheme = useGameStore((s) => s.selectTheme);
   const resetGame = useGameStore((s) => s.resetGame);
 
   return (
@@ -35,6 +38,25 @@ export function ShopTab() {
           <Gem className="h-4 w-4" /> {GACHA_COST} 골드로 뽑기
         </PixelButton>
         {gold < GACHA_COST && <div className="text-[11px] text-zinc-500">골드가 부족합니다</div>}
+      </div>
+
+      <div className="flex flex-col items-center gap-3 rounded border border-cyan-900/50 bg-cyan-950/10 p-4">
+        <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-cyan-400">
+          <FlaskConical className="h-3.5 w-3.5" /> 부활의 물약 (스트릭 실드)
+        </div>
+        <div className="text-4xl">🧪</div>
+        <p className="text-center text-[11px] text-zinc-500">
+          하루를 통째로 놓쳐도 연속 기록이 끊기지 않게 자동으로 지켜줘요. 보유: {streakShields}개
+        </p>
+        <PixelButton
+          variant="ghost"
+          onClick={buyStreakShield}
+          disabled={gold < STREAK_SHIELD_COST}
+          className="flex items-center gap-2"
+        >
+          <FlaskConical className="h-4 w-4" /> {STREAK_SHIELD_COST} 골드로 구매
+        </PixelButton>
+        {gold < STREAK_SHIELD_COST && <div className="text-[11px] text-zinc-500">골드가 부족합니다</div>}
       </div>
 
       <div>
@@ -63,24 +85,45 @@ export function ShopTab() {
 
       <div>
         <div className="mb-2 flex items-center gap-1 text-[11px] uppercase tracking-wider text-zinc-500">
-          <Sparkles className="h-3.5 w-3.5" /> 프리미엄 테마 (준비 중)
+          <Sparkles className="h-3.5 w-3.5" /> 프리미엄 테마
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {PREMIUM_THEMES.map((theme) => (
-            <div
-              key={theme.id}
-              className="relative flex flex-col items-center gap-1 rounded border border-zinc-800 bg-zinc-900/40 p-3 opacity-70"
-            >
-              <span className="text-2xl">{theme.icon}</span>
-              <span className="text-center text-[10px] text-zinc-400">{theme.name}</span>
-              <span className="absolute right-1 top-1 rounded bg-amber-500/90 px-1 text-[8px] font-bold text-zinc-950">
-                PRO
-              </span>
-              <Lock className="mt-1 h-3 w-3 text-zinc-500" />
-            </div>
-          ))}
+        <div className="grid grid-cols-4 gap-2">
+          {[DEFAULT_THEME_CARD, ...THEMES].map((theme) => {
+            const owned = theme.id === 'default' || ownedThemes.includes(theme.id);
+            const active = activeTheme === theme.id;
+            const affordable = gold >= theme.cost;
+            return (
+              <button
+                key={theme.id}
+                onClick={() => selectTheme(theme.id)}
+                disabled={!owned && !affordable}
+                title={owned ? theme.name : `${theme.name} — ${theme.cost} 골드`}
+                className={`relative flex flex-col items-center gap-1 rounded border p-3 transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  active
+                    ? 'border-emerald-500 bg-emerald-950/30'
+                    : 'border-zinc-800 bg-zinc-900/40 hover:border-zinc-600'
+                }`}
+              >
+                <span className="text-2xl">{theme.icon}</span>
+                <span className="text-center text-[10px] text-zinc-400">{theme.name}</span>
+                {active ? (
+                  <span className="flex items-center gap-0.5 text-[9px] font-bold text-emerald-400">
+                    <Check className="h-3 w-3" /> 적용됨
+                  </span>
+                ) : owned ? (
+                  <span className="text-[9px] text-zinc-500">적용하기</span>
+                ) : (
+                  <span className="flex items-center gap-0.5 text-[9px] font-bold text-amber-300">
+                    <Lock className="h-2.5 w-2.5" /> {theme.cost}G
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
-        <div className="mt-2 text-center text-[10px] text-zinc-600">추후 인앱결제로 제공될 예정입니다</div>
+        <div className="mt-2 text-center text-[10px] text-zinc-600">
+          골드로 구매하면 즉시 적용됩니다. 배경/헤더/하단 메뉴 색상이 바뀌어요.
+        </div>
       </div>
 
       <button

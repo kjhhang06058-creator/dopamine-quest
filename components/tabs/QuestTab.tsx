@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronRight, Flame, Gift, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Flame, Gift, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PixelButton } from '../ui/PixelButton';
 import { DopamineBar } from '../ui/DopamineBar';
 import { PrePlannedRewardCard } from '../reward/PrePlannedRewardCard';
+import { MicroQuest, TaskSplitModal } from '../task/TaskSplitModal';
 import { Difficulty } from '@/types';
 
 const DIFFICULTY_META: Record<Difficulty, { label: string; color: string }> = {
@@ -20,10 +21,16 @@ const MILESTONE_OPTIONS = [70, 80, 90];
 export function QuestTab() {
   const tasks = useGameStore((s) => s.tasks);
   const addTask = useGameStore((s) => s.addTask);
+  const addBatchTasks = useGameStore((s) => s.addBatchTasks);
   const completeTask = useGameStore((s) => s.completeTask);
   const advanceTask = useGameStore((s) => s.advanceTask);
   const failTask = useGameStore((s) => s.failTask);
   const deleteTask = useGameStore((s) => s.deleteTask);
+  const editTask = useGameStore((s) => s.editTask);
+  const clearCompleted = useGameStore((s) => s.clearCompleted);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const [title, setTitle] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
@@ -31,39 +38,81 @@ export function QuestTab() {
   const [target, setTarget] = useState(5);
   const [preReward, setPreReward] = useState('');
   const [milestonePercent, setMilestonePercent] = useState(80);
+  const [checkingSplit, setCheckingSplit] = useState(false);
+  const [splitSuggestion, setSplitSuggestion] = useState<{ title: string; quests: MicroQuest[] } | null>(null);
 
   const pending = tasks.filter((t) => !t.done);
   const done = tasks.filter((t) => t.done);
 
-  function handleAdd() {
+  async function handleAdd() {
     const trimmed = title.trim();
     if (!trimmed) return;
+
     if (goalMode) {
       const rewardTrimmed = preReward.trim();
       if (!rewardTrimmed) return;
       addTask(trimmed, difficulty, { target, preReward: rewardTrimmed, milestonePercent });
-    } else {
-      addTask(trimmed, difficulty);
+      setTitle('');
+      setPreReward('');
+      return;
     }
+
+    // Goal mode already IS an explicit multi-step setup, so only single-shot quests get the
+    // "이렇게 나눠볼까요?" complexity check — never both at once.
+    setCheckingSplit(true);
+    try {
+      const res = await fetch('/api/decompose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskTitle: trimmed }),
+      });
+      const data = res.ok ? ((await res.json()) as { complex: boolean; quests: MicroQuest[] }) : null;
+      if (data?.complex) {
+        setSplitSuggestion({ title: trimmed, quests: data.quests });
+        return;
+      }
+    } catch {
+      // Network hiccup — don't block adding the task, just skip the split suggestion this time.
+    } finally {
+      setCheckingSplit(false);
+    }
+
+    addTask(trimmed, difficulty);
     setTitle('');
-    setPreReward('');
+  }
+
+  function handleAcceptSplit() {
+    if (!splitSuggestion) return;
+    addBatchTasks(splitSuggestion.quests.map((q) => ({ title: q.title, difficulty: q.difficulty as Difficulty })));
+    setSplitSuggestion(null);
+    setTitle('');
+  }
+
+  function handleKeepSingle() {
+    if (!splitSuggestion) return;
+    addTask(splitSuggestion.title, difficulty);
+    setSplitSuggestion(null);
+    setTitle('');
   }
 
   return (
     <div className="flex flex-col gap-4 p-4">
       <PrePlannedRewardCard />
 
+      <TaskSplitModal suggestion={splitSuggestion} onAcceptSplit={handleAcceptSplit} onKeepSingle={handleKeepSingle} />
+
       <div className="flex flex-col gap-2">
         <div className="flex gap-2">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !goalMode && handleAdd()}
+            onKeyDown={(e) => e.key === 'Enter' && !goalMode && !e.nativeEvent.isComposing && handleAdd()}
             placeholder="오늘의 퀘스트를 입력하세요"
-            className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+            disabled={checkingSplit}
+            className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-500 disabled:opacity-60"
           />
-          <PixelButton onClick={handleAdd} className="flex items-center gap-1">
-            <Plus className="h-4 w-4" /> 추가
+          <PixelButton onClick={handleAdd} disabled={checkingSplit} className="flex items-center gap-1">
+            {checkingSplit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} 추가
           </PixelButton>
         </div>
 
@@ -110,7 +159,7 @@ export function QuestTab() {
               <input
                 value={preReward}
                 onChange={(e) => setPreReward(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleAdd()}
                 placeholder="예: 아이스라떼, 게임 1시간"
                 className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 outline-none focus:border-amber-500"
               />
@@ -134,7 +183,7 @@ export function QuestTab() {
               </div>
             </div>
             <p className="text-[10px] text-zinc-500">
-              목표 진행 {milestonePercent}%에 도달하면 사전 보상 알림이 뜨고, 목표를 다 채우면 몬스터 공격 보상까지
+              목표 진행 {milestonePercent}%에 도달하면 사전 보상 알림이 뜨고, 목표를 다 채우면 완료 보상까지
               받습니다.
             </p>
           </div>
@@ -156,8 +205,37 @@ export function QuestTab() {
                 className="flex flex-col gap-2 rounded border border-zinc-800 bg-zinc-900/60 px-3 py-2"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-zinc-100">{task.title}</span>
+                  <div className="flex min-w-0 flex-col">
+                    {editingId === task.id ? (
+                      <input
+                        autoFocus
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        onBlur={() => {
+                          editTask(task.id, editingText);
+                          setEditingId(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                            editTask(task.id, editingText);
+                            setEditingId(null);
+                          }
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                        className="w-full rounded border border-emerald-600 bg-zinc-950 px-1.5 py-0.5 text-sm text-zinc-100 outline-none"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingId(task.id);
+                          setEditingText(task.title);
+                        }}
+                        className="truncate text-left text-sm text-zinc-100 hover:text-emerald-300"
+                        title="눌러서 제목 수정"
+                      >
+                        {task.title}
+                      </button>
+                    )}
                     <span className={`text-[10px] font-bold uppercase ${DIFFICULTY_META[task.difficulty].color}`}>
                       {DIFFICULTY_META[task.difficulty].label}
                     </span>
@@ -217,7 +295,16 @@ export function QuestTab() {
 
       {done.length > 0 && (
         <div className="flex flex-col gap-1 opacity-60">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500">완료됨</div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-500">완료됨 ({done.length})</span>
+            <button
+              onClick={() => clearCompleted()}
+              className="text-[10px] text-zinc-500 hover:text-zinc-300"
+              title="완료된 퀘스트 모두 지우기"
+            >
+              전체 지우기
+            </button>
+          </div>
           {done.map((task) => (
             <div
               key={task.id}

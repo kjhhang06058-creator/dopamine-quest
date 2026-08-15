@@ -5,11 +5,12 @@ import { motion } from 'framer-motion';
 import { Gift, Lock, RotateCcw, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PixelButton } from '../ui/PixelButton';
+import { isToday, todayStr } from '@/lib/day';
 
 const MILESTONE_OPTIONS = [70, 80, 90];
 
 export function PrePlannedRewardCard() {
-  const dailyReward = useGameStore((s) => s.dailyReward);
+  const storedReward = useGameStore((s) => s.dailyReward);
   const tasks = useGameStore((s) => s.tasks);
   const setDailyReward = useGameStore((s) => s.setDailyReward);
   const clearDailyReward = useGameStore((s) => s.clearDailyReward);
@@ -18,8 +19,13 @@ export function PrePlannedRewardCard() {
   const [title, setTitle] = useState('');
   const [milestonePercent, setMilestonePercent] = useState(80);
 
-  const total = tasks.length;
-  const doneCount = tasks.filter((t) => t.done).length;
+  // A reward reserved on an earlier day is expired — show the reserve form again instead of a stale card.
+  const dailyReward = storedReward && storedReward.date === todayStr() ? storedReward : null;
+
+  // Today's set = still-pending tasks + tasks finished today, matching the store's milestone math.
+  const todays = tasks.filter((t) => !t.done || isToday(t.completedAt));
+  const total = todays.length;
+  const doneCount = todays.filter((t) => t.done).length;
   const donePercent = total ? Math.round((doneCount / total) * 100) : 0;
 
   function handleSet() {
@@ -38,7 +44,7 @@ export function PrePlannedRewardCard() {
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSet()}
+          onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && handleSet()}
           placeholder="오늘의 예약 보상 (예: 두툼한 쿠키와 커피, 게임 1시간)"
           className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
         />
@@ -104,9 +110,18 @@ export function PrePlannedRewardCard() {
 
   return (
     <div className="flex flex-col gap-1.5 rounded border border-zinc-700 bg-zinc-900/60 px-3 py-2">
-      <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-300">
-        <Lock className="h-3.5 w-3.5 text-amber-400" />
-        {dailyReward.milestonePercent}% 달성 시 {dailyReward.title} 해금!
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-300">
+          <Lock className="h-3.5 w-3.5 text-amber-400" />
+          {dailyReward.milestonePercent}% 달성 시 {dailyReward.title} 받아요!
+        </div>
+        <button
+          onClick={clearDailyReward}
+          className="shrink-0 text-[11px] text-zinc-500 hover:text-zinc-300"
+          title="예약 취소하고 다시 설정"
+        >
+          취소
+        </button>
       </div>
       <div className="relative h-2 w-full overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950">
         <div

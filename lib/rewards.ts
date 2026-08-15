@@ -22,6 +22,11 @@ const CRIT_CHANCE = 0.12;
 
 export const BOSS_FAIL_DAMAGE = 40;
 
+/** Gold cost of one streak shield ("부활의 물약") in the shop. */
+export const STREAK_SHIELD_COST = 40;
+/** Consecutive 실패 처리 clicks (with no completion in between) that triggers the monster-weaken comeback debuff. */
+export const FAIL_STREAK_THRESHOLD = 2;
+
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }

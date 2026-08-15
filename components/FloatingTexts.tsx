@@ -12,6 +12,7 @@ const KIND_STYLE: Record<CombatEventKind, string> = {
   hurt: 'text-red-400',
   heal: 'text-sky-300 text-lg',
   gacha: 'text-violet-300',
+  guard: 'text-cyan-300 text-lg',
 };
 
 export function FloatingTexts() {

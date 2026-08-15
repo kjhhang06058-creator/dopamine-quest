@@ -15,3 +15,37 @@ body {
 ::selection {
   background: rgba(52, 211, 153, 0.35);
 }
+
+/* Premium theme reskins — swap the app chrome (background/header/monster zone/bottom nav accent).
+   Content inside tabs keeps its base zinc/emerald palette. */
+[data-theme='default'] {
+  --theme-bg-from: #18181b;
+  --theme-bg-to: #09090b;
+  --theme-border: #27272a;
+  --theme-accent: #34d399;
+  --theme-accent-glow: rgba(52, 211, 153, 0.4);
+}
+
+[data-theme='cyberpunk'] {
+  --theme-bg-from: #1a0b2e;
+  --theme-bg-to: #05010f;
+  --theme-border: #581c87;
+  --theme-accent: #f0abfc;
+  --theme-accent-glow: rgba(217, 70, 239, 0.55);
+}
+
+[data-theme='darkfantasy'] {
+  --theme-bg-from: #1c0a0a;
+  --theme-bg-to: #050202;
+  --theme-border: #450a0a;
+  --theme-accent: #fb7185;
+  --theme-accent-glow: rgba(190, 18, 60, 0.5);
+}
+
+[data-theme='gameboy'] {
+  --theme-bg-from: #1c2812;
+  --theme-bg-to: #0a0f06;
+  --theme-border: #2f3d16;
+  --theme-accent: #9bbc0f;
+  --theme-accent-glow: rgba(155, 188, 15, 0.5);
+}
