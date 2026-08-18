@@ -55,7 +55,7 @@ export function CareerHud() {
   const hpPct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
 
   return (
-    <div className="flex flex-col gap-2 border-b border-[var(--theme-border)] bg-zinc-950/90 px-4 py-3 backdrop-blur">
+    <div className="flex flex-col gap-1.5 border-b border-[var(--theme-border)] bg-zinc-950/90 px-4 py-2 backdrop-blur">
       {/* Track switcher */}
       <div className="relative flex items-center justify-between">
         <button
@@ -114,39 +114,39 @@ export function CareerHud() {
         </AnimatePresence>
       </div>
 
-      {/* Career progress meter */}
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[10px]">
-          <span className="text-zinc-500">{tier.statusLabel.exp}</span>
-          <span className="text-zinc-500">
-            {progress.isMax ? '최고 등급 달성' : `${progress.into} / ${progress.span}`}
-          </span>
+      {/* Career progress + HP side by side — stacking them made the top chrome eat most of a
+          phone screen once Hud, CareerHud, and CareerZone were all mounted. */}
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <div className="mb-0.5 flex items-center justify-between text-[9px]">
+            <span className="text-zinc-500">{tier.statusLabel.exp}</span>
+            <span className="text-zinc-600">{progress.isMax ? 'MAX' : `${progress.into}/${progress.span}`}</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950">
+            <motion.div
+              className="h-full bg-gradient-to-r from-amber-500 to-emerald-400"
+              animate={{ width: `${progress.ratio * 100}%` }}
+              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+            />
+          </div>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950">
-          <motion.div
-            className="h-full bg-gradient-to-r from-amber-500 to-emerald-400"
-            animate={{ width: `${progress.ratio * 100}%` }}
-            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-          />
-        </div>
-      </div>
 
-      {/* Mental / HP bar */}
-      <div>
-        <div className="mb-1 flex items-center justify-between text-[10px]">
-          <span className="flex items-center gap-1 text-zinc-500">
-            <Heart className="h-3 w-3 text-rose-400" /> {tier.statusLabel.hp}
-          </span>
-          <span className="text-zinc-500">
-            {hp} / {maxHp}
-          </span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950">
-          <motion.div
-            className="h-full bg-rose-500"
-            animate={{ width: `${hpPct}%` }}
-            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-          />
+        <div>
+          <div className="mb-0.5 flex items-center justify-between text-[9px]">
+            <span className="flex items-center gap-1 text-zinc-500">
+              <Heart className="h-2.5 w-2.5 text-rose-400" /> {tier.statusLabel.hp}
+            </span>
+            <span className="text-zinc-600">
+              {hp}/{maxHp}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-sm border border-zinc-700 bg-zinc-950">
+            <motion.div
+              className="h-full bg-rose-500"
+              animate={{ width: `${hpPct}%` }}
+              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+            />
+          </div>
         </div>
       </div>
     </div>

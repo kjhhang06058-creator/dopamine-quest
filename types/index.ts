@@ -2,6 +2,15 @@ export type Difficulty = 'easy' | 'normal' | 'hard';
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 export type ItemType = 'pet' | 'weapon';
 export type Tab = 'quest' | 'raid' | 'shop';
+export type TimeBlock = 'unassigned' | 'morning' | 'afternoon' | 'evening';
+
+/** Reward paired to a single task, unlocked when that task is completed. */
+export interface PairedReward {
+  id: string;
+  title: string;
+  isUnlocked: boolean;
+  isClaimed: boolean;
+}
 export type ThemeId = 'default' | 'cyberpunk' | 'darkfantasy' | 'gameboy';
 
 export interface Task {
@@ -22,6 +31,10 @@ export interface Task {
   milestonePercent: number;
   /** Whether the milestone reward burst already fired for this task. */
   milestoneFired: boolean;
+  /** Scheduler lane. Existing saves predate this field, so readers must default to 'unassigned'. */
+  timeBlock?: TimeBlock;
+  /** Reward paired to this specific task, unlocked on completion. */
+  pairedReward?: PairedReward;
 }
 
 export interface MilestoneAlert {

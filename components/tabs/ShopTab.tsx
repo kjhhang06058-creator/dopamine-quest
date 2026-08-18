@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, FlaskConical, Gem, Lock, RotateCcw, Sparkles } from 'lucide-react';
 import { useGameStore } from '@/store/useGameStore';
 import { PixelButton } from '../ui/PixelButton';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { GACHA_COST } from '@/lib/gacha';
 import { STREAK_SHIELD_COST } from '@/lib/rewards';
 import { THEMES } from '@/lib/themes';
@@ -28,6 +30,8 @@ export function ShopTab() {
   const buyStreakShield = useGameStore((s) => s.buyStreakShield);
   const selectTheme = useGameStore((s) => s.selectTheme);
   const resetGame = useGameStore((s) => s.resetGame);
+
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -127,13 +131,23 @@ export function ShopTab() {
       </div>
 
       <button
-        onClick={() => {
-          if (confirm('저장된 모든 진행 상황을 초기화할까요?')) resetGame();
-        }}
+        onClick={() => setConfirmReset(true)}
         className="flex items-center justify-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400"
       >
         <RotateCcw className="h-3 w-3" /> 진행 상황 초기화
       </button>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title="진행 상황을 초기화할까요?"
+        description="레벨, 골드, 퀘스트, 보유 아이템, 커리어 진행도가 모두 사라집니다. 되돌릴 수 없어요."
+        confirmLabel="초기화"
+        onConfirm={() => {
+          resetGame();
+          setConfirmReset(false);
+        }}
+        onCancel={() => setConfirmReset(false)}
+      />
     </div>
   );
 }

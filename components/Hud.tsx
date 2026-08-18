@@ -18,7 +18,7 @@ export function Hud() {
   // HP lives in CareerHud, which labels it per track (멘탈/체력) — duplicating hearts here just
   // ate vertical space on mobile now that both HUDs stack.
   return (
-    <div className="border-b border-[var(--theme-border)] bg-zinc-950/90 px-4 py-3 backdrop-blur">
+    <div className="border-b border-[var(--theme-border)] bg-zinc-950/90 px-4 py-2 backdrop-blur">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 text-xs">
           <span className="rounded border border-emerald-700 bg-emerald-950 px-2 py-0.5 font-bold text-emerald-300">

@@ -38,7 +38,7 @@ export function CareerZone() {
   }, [events, controls]);
 
   return (
-    <div className="relative flex flex-col items-center gap-2 py-3">
+    <div className="relative flex flex-col items-center gap-1.5 py-2">
       <motion.div animate={controls} className="text-6xl drop-shadow-[0_0_12px_var(--theme-accent-glow)]">
         {tier.zoneIcon}
       </motion.div>

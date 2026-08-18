@@ -11,6 +11,7 @@ import {
   MilestoneAlert,
   Task,
   ThemeId,
+  TimeBlock,
 } from '@/types';
 import {
   expToNextLevel,
@@ -164,6 +165,12 @@ interface GameActions {
   editTask: (id: string, title: string) => void;
   /** Clears finished tasks so the completed list doesn't grow without bound. */
   clearCompleted: () => void;
+  /** Moves a task to a scheduler lane, optionally at a specific position within that lane. */
+  moveTask: (taskId: string, targetBlock: TimeBlock, newIndex?: number) => void;
+  /** Pairs a real-world reward to a task (blank title clears it). Unlocks automatically on completion. */
+  setPairedReward: (taskId: string, title: string) => void;
+  /** Consumes an unlocked paired reward: +30 HP now and a 1.5x EXP buff on the next completion. */
+  claimPairedReward: (taskId: string) => void;
 
   /** Reserves a single reward for the day, unlocked once overall task completion reaches milestonePercent. */
   setDailyReward: (title: string, milestonePercent: number) => void;
@@ -318,7 +325,15 @@ export const useGameStore = create<CoreState & GameActions>()(
 
           return {
             tasks: s.tasks.map((t) =>
-              t.id === id ? { ...t, done: true, progress: finalProgress, completedAt: Date.now() } : t,
+              t.id === id
+                ? {
+                    ...t,
+                    done: true,
+                    progress: finalProgress,
+                    completedAt: Date.now(),
+                    pairedReward: t.pairedReward ? { ...t.pairedReward, isUnlocked: true } : undefined,
+                  }
+                : t,
             ),
             exp: applied.exp,
             level: applied.level,
@@ -367,6 +382,7 @@ export const useGameStore = create<CoreState & GameActions>()(
               preReward: options?.preReward,
               milestonePercent: options?.milestonePercent ?? DEFAULT_MILESTONE_PERCENT,
               milestoneFired: false,
+              timeBlock: 'unassigned',
             },
             ...s.tasks,
           ],
@@ -388,6 +404,7 @@ export const useGameStore = create<CoreState & GameActions>()(
           preReward: t.options?.preReward,
           milestonePercent: t.options?.milestonePercent ?? DEFAULT_MILESTONE_PERCENT,
           milestoneFired: false,
+          timeBlock: 'unassigned',
         }));
         set((s) => ({ tasks: [...newTasks, ...s.tasks], updatedAt: now }));
       },
@@ -493,6 +510,63 @@ export const useGameStore = create<CoreState & GameActions>()(
 
       clearCompleted: () =>
         set((s) => ({ tasks: s.tasks.filter((t) => !t.done), updatedAt: Date.now() })),
+
+      moveTask: (taskId, targetBlock, newIndex) => {
+        set((s) => {
+          const moving = s.tasks.find((t) => t.id === taskId);
+          if (!moving) return {};
+
+          // Splice into the global array rather than regrouping by lane — regrouping reordered
+          // every other task too, so a drag in the scheduler silently reshuffled the list view.
+          const without = s.tasks.filter((t) => t.id !== taskId);
+          const laneOf = (t: Task) => t.timeBlock ?? 'unassigned';
+          const lanePositions = without
+            .map((t, i) => (laneOf(t) === targetBlock ? i : -1))
+            .filter((i) => i >= 0);
+
+          const at =
+            newIndex !== undefined && newIndex < lanePositions.length
+              ? lanePositions[Math.max(0, newIndex)]
+              : lanePositions.length > 0
+                ? lanePositions[lanePositions.length - 1] + 1
+                : without.length;
+
+          const next = [...without];
+          next.splice(at, 0, { ...moving, timeBlock: targetBlock });
+          return { tasks: next, updatedAt: Date.now() };
+        });
+      },
+
+      setPairedReward: (taskId, title) => {
+        const trimmed = title.trim();
+        set((s) => ({
+          tasks: s.tasks.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  pairedReward: trimmed
+                    ? { id: uid(), title: trimmed, isUnlocked: t.done, isClaimed: false }
+                    : undefined,
+                }
+              : t,
+          ),
+          updatedAt: Date.now(),
+        }));
+      },
+
+      claimPairedReward: (taskId) => {
+        const task = get().tasks.find((t) => t.id === taskId);
+        const reward = task?.pairedReward;
+        if (!reward || !reward.isUnlocked || reward.isClaimed) return;
+        grantRewardBonus(reward.title);
+        set((s) => ({
+          tasks: s.tasks.map((t) =>
+            t.id === taskId && t.pairedReward
+              ? { ...t, pairedReward: { ...t.pairedReward, isClaimed: true } }
+              : t,
+          ),
+        }));
+      },
 
       startBoss: (minutes) =>
         set({
