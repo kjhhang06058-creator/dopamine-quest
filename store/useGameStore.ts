@@ -264,6 +264,23 @@ export const useGameStore = create<CoreState & GameActions>()(
           set({ streakDays: 1, lastActiveDate: today, updatedAt: Date.now() });
           get().pushEvent({ kind: 'hurt', text: '스트릭이 끊겼어요. 오늘부터 다시 시작해봐요!' });
         }
+
+        // A new day is a rest: 멘탈/체력 that only ever drained meant yesterday's failures
+        // followed you forever.
+        if (get().hp < get().maxHp) {
+          set((st) => ({ hp: st.maxHp, updatedAt: Date.now() }));
+          get().pushEvent({ kind: 'heal', text: '새로운 하루! 컨디션 회복 완료' });
+        }
+      }
+
+      /** HP bottoming out used to be a permanent dead-end — nothing checked hp <= 0, so a run of
+       * failures left an empty bar with no way back, which is exactly the guilt spiral this app
+       * is meant to prevent. Bottoming out now forces a rest instead of a punishment. */
+      function recoverFromBurnout() {
+        if (get().hp > 0) return;
+        const restored = Math.round(get().maxHp * 0.5);
+        set({ hp: restored, updatedAt: Date.now() });
+        get().pushEvent({ kind: 'heal', text: `무리했어요. 쉬고 다시 시작해요 (+${restored})` });
       }
 
       /** Adds cumulative career EXP, pays out the repeatable segment bonus, and fires the promotion
@@ -487,6 +504,7 @@ export const useGameStore = create<CoreState & GameActions>()(
           updatedAt: Date.now(),
         }));
         get().pushEvent({ kind: 'hurt', text: `-${dmg} HP` });
+        recoverFromBurnout();
 
         // Anti-guilt comeback: with no monster HP left to shave, the lowered hurdle is now a
         // guaranteed 1.5x EXP buff on the next completion — same intent, and not farmable for gold.
@@ -629,6 +647,7 @@ export const useGameStore = create<CoreState & GameActions>()(
           kind: 'hurt',
           text: `${CAREER_TRACKS[get().currentTrack].raid.fail} -${BOSS_FAIL_DAMAGE} HP`,
         });
+        recoverFromBurnout();
       },
 
       resetBoss: () => set({ bossStatus: 'idle', bossSecondsLeft: 0, bossTotalSeconds: 0 }),
@@ -702,13 +721,28 @@ export const useGameStore = create<CoreState & GameActions>()(
           expBuffActive: false,
           activeDailyMilestone: false,
           pendingPromotion: null,
+          bossStatus: 'idle',
+          bossSecondsLeft: 0,
+          bossTotalSeconds: 0,
         }),
       };
     },
     {
       name: 'dopamine-quest-save',
       partialize: (s) => {
-        const { events, activeMilestone, expBuffActive, activeDailyMilestone, pendingPromotion, ...rest } = s;
+        // Boss-raid runtime is deliberately NOT persisted: leaving the app is supposed to end a
+        // raid, but persisting it let you close the tab and return to a still-running timer.
+        const {
+          events,
+          activeMilestone,
+          expBuffActive,
+          activeDailyMilestone,
+          pendingPromotion,
+          bossStatus,
+          bossSecondsLeft,
+          bossTotalSeconds,
+          ...rest
+        } = s;
         return rest;
       },
     },

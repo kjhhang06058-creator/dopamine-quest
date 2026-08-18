@@ -124,11 +124,25 @@ export function QuestList() {
         })}
       </AnimatePresence>
 
-      {pending.length === 0 && (
-        <div className="rounded border border-dashed border-zinc-800 py-6 text-center text-xs text-zinc-500">
-          대기 중인 퀘스트가 없습니다. 새 퀘스트를 추가해보세요!
-        </div>
-      )}
+      {pending.length === 0 &&
+        (tasks.length === 0 ? (
+          // First run: an empty board with a career HUD on top explained nothing about what to do.
+          <div className="flex flex-col gap-2 rounded border border-dashed border-zinc-700 p-4 text-center">
+            <div className="text-2xl">🎯</div>
+            <div className="text-xs font-bold text-zinc-300">첫 퀘스트를 추가해보세요</div>
+            <p className="text-[11px] leading-relaxed text-zinc-500">
+              할 일을 적고 <span className="text-emerald-400">추가</span>를 누르면 됩니다. 큰 일이면 AI가 3단계로
+              나눠줄지 물어봐요.
+              <br />
+              완료할 때마다 점수가 쌓여 위쪽 <span className="text-amber-300">등급이 승진</span>합니다 — 상단에서
+              공무원 / 전문직 / 판타지 중 원하는 테마를 고를 수 있어요.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-zinc-800 py-6 text-center text-xs text-zinc-500">
+            대기 중인 퀘스트를 모두 끝냈어요! 🎉
+          </div>
+        ))}
     </div>
   );
 }
